@@ -6,9 +6,13 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
-        sm: ".1875rem", /* 3px */
+        lg: ".5rem", /* 8px - Windows-like rounded corners */
+        md: ".25rem", /* 4px */
+        sm: ".125rem", /* 2px */
+      },
+      height: {
+        '8': '32px', // Title bar height
+        '12': '48px', // Taskbar height
       },
       colors: {
         // Flat / base colors (regular buttons)
