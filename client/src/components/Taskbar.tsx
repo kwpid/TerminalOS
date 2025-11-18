@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
-import { Terminal, Code, FolderOpen, FileText, Activity, Globe, Menu, Clock, Store, Zap } from "lucide-react";
+import { Terminal, Code, FolderOpen, FileText, Activity, Globe, Menu, Clock, Store, Zap, X, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { WindowState } from "@shared/schema";
 
 interface TaskbarProps {
@@ -9,6 +11,7 @@ interface TaskbarProps {
   onOpenApp: (appType: WindowState["appType"]) => void;
   onFocusWindow: (id: string) => void;
   onMinimizeWindow: (id: string) => void;
+  onCloseWindow: (id: string) => void;
 }
 
 const APP_MENU = [
@@ -22,9 +25,28 @@ const APP_MENU = [
   { type: "taskmanager" as const, icon: Activity, label: "Task Manager", color: "text-red-400" },
 ];
 
-export function Taskbar({ windows, onOpenApp, onFocusWindow, onMinimizeWindow }: TaskbarProps) {
+export function Taskbar({ windows, onOpenApp, onFocusWindow, onMinimizeWindow, onCloseWindow }: TaskbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  const [propertiesWindow, setPropertiesWindow] = useState<WindowState | null>(null);
+
+  const formatUptime = (createdAt: string | Date | number | null | undefined) => {
+    if (!createdAt) return "Unknown";
+    
+    const now = new Date();
+    const createdDate = new Date(createdAt);
+    
+    if (isNaN(createdDate.getTime())) return "Unknown";
+    
+    const diff = now.getTime() - createdDate.getTime();
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    
+    if (hours > 0) return `${hours}h ${minutes % 60}m`;
+    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+    return `${seconds}s`;
+  };
 
   // Update time every minute
   useEffect(() => {
@@ -85,22 +107,42 @@ export function Taskbar({ windows, onOpenApp, onFocusWindow, onMinimizeWindow }:
           const Icon = app.icon;
 
           return (
-            <Button
-              key={window.id}
-              variant={window.isMinimized ? "ghost" : "secondary"}
-              className="h-9 px-3 gap-2 max-w-[200px]"
-              onClick={() => {
-                if (window.isMinimized) {
-                  onFocusWindow(window.id);
-                } else {
-                  onMinimizeWindow(window.id);
-                }
-              }}
-              data-testid={`taskbar-window-${window.id}`}
-            >
-              <Icon className={`w-4 h-4 ${app.color} flex-shrink-0`} />
-              <span className="text-xs truncate">{window.title}</span>
-            </Button>
+            <ContextMenu key={window.id}>
+              <ContextMenuTrigger asChild>
+                <Button
+                  variant={window.isMinimized ? "ghost" : "secondary"}
+                  className="h-9 px-3 gap-2 max-w-[200px]"
+                  onClick={() => {
+                    if (window.isMinimized) {
+                      onFocusWindow(window.id);
+                    } else {
+                      onMinimizeWindow(window.id);
+                    }
+                  }}
+                  data-testid={`taskbar-window-${window.id}`}
+                >
+                  <Icon className={`w-4 h-4 ${app.color} flex-shrink-0`} />
+                  <span className="text-xs truncate">{window.title}</span>
+                </Button>
+              </ContextMenuTrigger>
+              <ContextMenuContent className="w-48" data-testid={`context-menu-${window.id}`}>
+                <ContextMenuItem
+                  onClick={() => setPropertiesWindow(window)}
+                  data-testid={`menu-item-properties-${window.id}`}
+                >
+                  <Info className="w-4 h-4 mr-2" />
+                  Properties
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onClick={() => onCloseWindow(window.id)}
+                  className="text-destructive"
+                  data-testid={`menu-item-close-${window.id}`}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Close
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           );
         })}
       </div>
@@ -112,6 +154,53 @@ export function Taskbar({ windows, onOpenApp, onFocusWindow, onMinimizeWindow }:
           <span>{currentTime}</span>
         </div>
       </div>
+
+      {/* Window Properties Dialog */}
+      <Dialog open={!!propertiesWindow} onOpenChange={() => setPropertiesWindow(null)}>
+        <DialogContent className="sm:max-w-md" data-testid="window-properties-dialog">
+          <DialogHeader>
+            <DialogTitle>Window Properties</DialogTitle>
+          </DialogHeader>
+          {propertiesWindow && (
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="text-muted-foreground">Window ID</div>
+                <div className="font-mono text-xs bg-muted p-2 rounded-md mt-1" data-testid="property-window-id">
+                  {propertiesWindow.id}
+                </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Title</div>
+                <div className="mt-1" data-testid="property-title">{propertiesWindow.title}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Application Type</div>
+                <div className="mt-1" data-testid="property-app-type">{propertiesWindow.appType}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Path</div>
+                <div className="font-mono text-xs bg-muted p-2 rounded-md mt-1" data-testid="property-path">
+                  {propertiesWindow.path || "N/A"}
+                </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Uptime</div>
+                <div className="mt-1" data-testid="property-uptime">
+                  {formatUptime(propertiesWindow.createdAt)}
+                </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">State</div>
+                <div className="mt-1 flex gap-2 flex-wrap" data-testid="property-state">
+                  {propertiesWindow.isMinimized && <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded-md">Minimized</span>}
+                  {propertiesWindow.isMaximized && <span className="text-xs bg-blue-500/20 text-blue-500 px-2 py-1 rounded-md">Maximized</span>}
+                  {!propertiesWindow.isMinimized && !propertiesWindow.isMaximized && <span className="text-xs bg-green-500/20 text-green-500 px-2 py-1 rounded-md">Normal</span>}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

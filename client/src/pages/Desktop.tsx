@@ -403,6 +403,7 @@ SYSTEM:
         onOpenApp={(appType) => createWindow(appType)}
         onFocusWindow={focusWindow}
         onMinimizeWindow={minimizeWindow}
+        onCloseWindow={closeWindow}
       />
     </div>
   );
