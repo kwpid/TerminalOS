@@ -104,6 +104,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Extension API Routes
+  app.get("/api/extensions", async (req, res) => {
+    try {
+      const extensions = await storage.getExtensions();
+      res.json(extensions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch extensions" });
+    }
+  });
+
+  app.get("/api/extensions/:id", async (req, res) => {
+    try {
+      const extension = await storage.getExtension(req.params.id);
+      if (!extension) {
+        return res.status(404).json({ error: "Extension not found" });
+      }
+      res.json(extension);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch extension" });
+    }
+  });
+
+  app.post("/api/extensions/:id/install", async (req, res) => {
+    try {
+      const extension = await storage.installExtension(req.params.id);
+      res.json(extension);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to install extension" });
+    }
+  });
+
+  app.post("/api/extensions/:id/uninstall", async (req, res) => {
+    try {
+      const extension = await storage.uninstallExtension(req.params.id);
+      res.json(extension);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to uninstall extension" });
+    }
+  });
+
+  app.post("/api/extensions/:id/update", async (req, res) => {
+    try {
+      const updated = await storage.updateExtension(req.params.id);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update extension" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

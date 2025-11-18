@@ -192,3 +192,34 @@ export interface Process {
   memory: number;
   windowId?: string;
 }
+
+// Extension Management Types
+export interface LanguageExtension {
+  id: string;
+  name: string;
+  displayName: string;
+  version: string;
+  description: string;
+  author: string;
+  fileExtensions: string[]; // e.g., [".fxo", ".fxm"]
+  languageIds: string[]; // e.g., ["fluxo", "fluxo-module"]
+  icon?: string; // Icon URL or emoji
+  isInstalled: boolean;
+  installedVersion?: string;
+  availableVersion?: string;
+  hasUpdate: boolean;
+  installDate?: number;
+}
+
+export const insertLanguageExtensionSchema = z.object({
+  name: z.string().min(1),
+  displayName: z.string().min(1),
+  version: z.string().min(1),
+  description: z.string(),
+  author: z.string(),
+  fileExtensions: z.array(z.string()),
+  languageIds: z.array(z.string()),
+  icon: z.string().optional(),
+});
+
+export type InsertLanguageExtension = z.infer<typeof insertLanguageExtensionSchema>;

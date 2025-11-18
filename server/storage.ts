@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import type { FileSystemItem, InsertFileSystemItem, WindowState, InsertWindowState, AppBackendCode } from "@shared/schema";
+import type { FileSystemItem, InsertFileSystemItem, WindowState, InsertWindowState, AppBackendCode, LanguageExtension, InsertLanguageExtension } from "@shared/schema";
 
 export interface IStorage {
   // File System Operations
@@ -15,23 +15,36 @@ export interface IStorage {
   createWindow(window: InsertWindowState): Promise<WindowState>;
   updateWindow(id: string, updates: Partial<WindowState>): Promise<WindowState>;
   deleteWindow(id: string): Promise<void>;
+  
+  // Extension Operations
+  getExtensions(): Promise<LanguageExtension[]>;
+  getExtension(id: string): Promise<LanguageExtension | undefined>;
+  installExtension(id: string): Promise<LanguageExtension>;
+  uninstallExtension(id: string): Promise<LanguageExtension>;
+  updateExtension(id: string): Promise<LanguageExtension>;
 }
 
 export class MemStorage implements IStorage {
   private fileSystemItems: Map<string, FileSystemItem>;
   private windows: Map<string, WindowState>;
+  private extensions: Map<string, LanguageExtension>;
   private nextFileId: number = 1;
   private nextWindowId: number = 1;
+  private nextExtensionId: number = 1;
 
   constructor() {
     this.fileSystemItems = new Map();
     this.windows = new Map();
+    this.extensions = new Map();
     
     // Initialize with default file system
     this.initializeDefaultFileSystem();
     
     // Initialize with default windows
     this.initializeDefaultWindows();
+    
+    // Initialize with default extensions
+    this.initializeDefaultExtensions();
   }
 
   private initializeDefaultFileSystem() {
@@ -527,6 +540,133 @@ export class CodeEditor {
 
   async deleteWindow(id: string): Promise<void> {
     this.windows.delete(id);
+  }
+
+  // Extension Operations
+  private initializeDefaultExtensions() {
+    const defaultExtensions = [
+      {
+        id: "ext-fluxo-1",
+        name: "fluxo",
+        displayName: "Fluxo Language Support",
+        version: "1.2.0",
+        description: "Language support for Fluxo (.fxo) and Fluxo-Module (.fxm) files with syntax highlighting and IntelliSense",
+        author: "Fluxo Team",
+        fileExtensions: [".fxo", ".fxm", ".fluxo"],
+        languageIds: ["fluxo", "fluxo-module"],
+        icon: "⚡",
+        isInstalled: false,
+      },
+      {
+        id: "ext-lua-1",
+        name: "lua",
+        displayName: "Lua Language Support",
+        version: "2.0.0",
+        description: "Enhanced Lua language support with advanced features",
+        author: "Lua Community",
+        fileExtensions: [".lua"],
+        languageIds: ["lua"],
+        icon: "🌙",
+        isInstalled: true,
+        installedVersion: "2.0.0",
+        installDate: Date.now(),
+      },
+    ];
+
+    for (const extension of defaultExtensions) {
+      this.extensions.set(extension.id, extension as LanguageExtension);
+    }
+  }
+
+  async getExtensions(): Promise<LanguageExtension[]> {
+    return Array.from(this.extensions.values()).map(ext => {
+      const { hasUpdate: _omit, ...rest } = ext;
+      return {
+        ...rest,
+        hasUpdate: !!(ext.isInstalled && ext.availableVersion),
+      };
+    });
+  }
+
+  async getExtension(id: string): Promise<LanguageExtension | undefined> {
+    const extension = this.extensions.get(id);
+    if (!extension) return undefined;
+    
+    const { hasUpdate: _omit, ...rest } = extension;
+    return {
+      ...rest,
+      hasUpdate: !!(extension.isInstalled && extension.availableVersion),
+    };
+  }
+
+  async installExtension(id: string): Promise<LanguageExtension> {
+    const extension = this.extensions.get(id);
+    if (!extension) {
+      throw new Error(`Extension ${id} not found`);
+    }
+    
+    // Remove hasUpdate from stored object and set new values
+    const { hasUpdate: _omit, ...rest } = extension;
+    const updated = {
+      ...rest,
+      isInstalled: true,
+      installedVersion: extension.version,
+      availableVersion: undefined,
+      installDate: Date.now(),
+    };
+    this.extensions.set(id, updated as LanguageExtension);
+    
+    // Return with computed hasUpdate
+    return {
+      ...updated,
+      hasUpdate: !!(updated.isInstalled && updated.availableVersion),
+    };
+  }
+
+  async uninstallExtension(id: string): Promise<LanguageExtension> {
+    const extension = this.extensions.get(id);
+    if (!extension) {
+      throw new Error(`Extension ${id} not found`);
+    }
+    
+    // Remove hasUpdate from stored object and clear installed state
+    const { hasUpdate: _omit, ...rest } = extension;
+    const updated = {
+      ...rest,
+      isInstalled: false,
+      installedVersion: undefined,
+      availableVersion: undefined,
+      installDate: undefined,
+    };
+    this.extensions.set(id, updated as LanguageExtension);
+    
+    // Return with computed hasUpdate
+    return {
+      ...updated,
+      hasUpdate: !!(updated.isInstalled && updated.availableVersion),
+    };
+  }
+
+  async updateExtension(id: string): Promise<LanguageExtension> {
+    const extension = this.extensions.get(id);
+    if (!extension) {
+      throw new Error(`Extension ${id} not found`);
+    }
+    
+    // Remove hasUpdate from stored object and update to catalog version
+    const { hasUpdate: _omit, ...rest } = extension;
+    const updated = {
+      ...rest,
+      installedVersion: extension.version,
+      availableVersion: undefined,
+    };
+    this.extensions.set(id, updated as LanguageExtension);
+    
+    // Return with computed hasUpdate
+    return {
+      ...updated,
+      hasUpdate: !!(updated.isInstalled && updated.availableVersion),
+    };
   }
 }
 

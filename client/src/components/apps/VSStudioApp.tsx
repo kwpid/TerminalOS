@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronRight, ChevronDown, File, Folder, Plus, X, Save, FolderPlus, FilePlus, FolderOpen as FolderOpenIcon } from "lucide-react";
+import { ChevronRight, ChevronDown, File, Folder, Plus, X, Save, FolderPlus, FilePlus, FolderOpen as FolderOpenIcon, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { CodeEditor } from "@/components/CodeEditor";
+import { ExtensionManager } from "./ExtensionManager";
 import type { FileSystemItem } from "@shared/schema";
 
 interface VSStudioAppProps {
@@ -22,6 +23,8 @@ interface OpenTab {
   name: string;
   content: string;
   language: string;
+  isSaved: boolean; // Whether this file exists in the file system
+  fileId?: string; // The actual file system ID (different from tab ID for virtual files)
 }
 
 export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, workspacePath }: VSStudioAppProps) {
@@ -32,10 +35,13 @@ export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, work
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<Set<string>>(new Set());
   const [showDashboard, setShowDashboard] = useState(!workspacePath);
   const [showDirectoryPicker, setShowDirectoryPicker] = useState(false);
-  const [pickerAction, setPickerAction] = useState<"folder" | "file" | "import">("folder");
+  const [pickerAction, setPickerAction] = useState<"folder" | "file" | "import" | "saveas">("folder");
   const [selectedDirectory, setSelectedDirectory] = useState<string | null>(null);
   const [newItemName, setNewItemName] = useState("");
   const [currentWorkspace, setCurrentWorkspace] = useState<string | null>(workspacePath || null);
+  const [saveAsTabId, setSaveAsTabId] = useState<string | null>(null);
+  const [virtualTabCounter, setVirtualTabCounter] = useState(1);
+  const [showExtensionManager, setShowExtensionManager] = useState(false);
   const { toast } = useToast();
 
   const toggleFolder = (folderId: string) => {
@@ -50,12 +56,34 @@ export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, work
     });
   };
 
+  const createVirtualTab = (fileName: string, language: string) => {
+    const tabId = `virtual-${Date.now()}-${virtualTabCounter}`;
+    setVirtualTabCounter(prev => prev + 1);
+
+    const newTab: OpenTab = {
+      id: tabId,
+      name: fileName,
+      content: "",
+      language,
+      isSaved: false,
+    };
+
+    setOpenTabs(prev => [...prev, newTab]);
+    setActiveTab(tabId);
+    setHasUnsavedChanges(prev => new Set(Array.from(prev).concat(tabId)));
+    
+    toast({
+      title: "New file created",
+      description: `${fileName} - Remember to save!`,
+    });
+  };
+
   const openFileInEditor = (file: FileSystemItem) => {
     if (file.type !== "file") return;
 
-    const existingTab = openTabs.find(tab => tab.id === file.id);
+    const existingTab = openTabs.find(tab => tab.fileId === file.id || tab.id === file.id);
     if (existingTab) {
-      setActiveTab(file.id);
+      setActiveTab(existingTab.id);
       return;
     }
 
@@ -64,6 +92,8 @@ export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, work
       name: file.name,
       content: file.content || "",
       language: file.language || "plaintext",
+      isSaved: true,
+      fileId: file.id,
     };
 
     setOpenTabs(prev => [...prev, newTab]);
@@ -88,8 +118,17 @@ export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, work
 
   const saveFile = (tabId: string) => {
     const tab = openTabs.find(t => t.id === tabId);
-    if (tab) {
-      onSaveFile(tabId, tab.content);
+    if (!tab) return;
+
+    // If it's a virtual file (not saved), open Save As dialog
+    if (!tab.isSaved) {
+      openSaveAsDialog(tabId);
+      return;
+    }
+
+    // Otherwise save to existing file
+    if (tab.fileId) {
+      onSaveFile(tab.fileId, tab.content);
       setHasUnsavedChanges(prev => {
         const next = new Set(prev);
         next.delete(tabId);
@@ -100,6 +139,17 @@ export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, work
         description: `${tab.name} has been saved.`,
       });
     }
+  };
+
+  const openSaveAsDialog = (tabId: string) => {
+    setSaveAsTabId(tabId);
+    const tab = openTabs.find(t => t.id === tabId);
+    if (tab) {
+      setNewItemName(tab.name);
+    }
+    setPickerAction("saveas");
+    setSelectedDirectory(currentWorkspace);
+    setShowDirectoryPicker(true);
   };
 
   const saveAllFiles = () => {
@@ -137,7 +187,80 @@ export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, work
           description: `Opened workspace at ${fileSystem.find(f => f.id === selectedDirectory)?.name}`,
         });
       }
-    } else {
+      setShowDirectoryPicker(false);
+      return;
+    }
+
+    if (pickerAction === "saveas") {
+      if (!newItemName.trim()) {
+        toast({
+          title: "Error",
+          description: "Please enter a file name",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!saveAsTabId) {
+        toast({
+          title: "Error",
+          description: "No file to save",
+          variant: "destructive",
+        });
+        setShowDirectoryPicker(false);
+        return;
+      }
+
+      try {
+        const tab = openTabs.find(t => t.id === saveAsTabId);
+        if (!tab) return;
+
+        // Detect language from filename
+        const ext = newItemName.split(".").pop()?.toLowerCase() || "txt";
+        const detectedLang = tab.language;
+
+        // Create the file in the file system
+        const newItem = await onCreate(
+          newItemName,
+          "file",
+          selectedDirectory,
+          tab.content
+        );
+
+        // Update the tab to reference the saved file
+        setOpenTabs(prev =>
+          prev.map(t =>
+            t.id === saveAsTabId
+              ? { ...t, isSaved: true, fileId: newItem.id, name: newItemName }
+              : t
+          )
+        );
+
+        setHasUnsavedChanges(prev => {
+          const next = new Set(prev);
+          next.delete(saveAsTabId);
+          return next;
+        });
+
+        toast({
+          title: "File saved",
+          description: `${newItemName} has been saved to the file system.`,
+        });
+
+        setSaveAsTabId(null);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to save file",
+          variant: "destructive",
+        });
+      }
+      setShowDirectoryPicker(false);
+      return;
+    }
+
+    // Handle regular file/folder creation
+    if (pickerAction === "file" || pickerAction === "folder") {
       if (!newItemName.trim()) {
         toast({
           title: "Error",
@@ -148,24 +271,50 @@ export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, work
       }
 
       try {
-        const newItem = await onCreate(
-          newItemName,
-          pickerAction,
-          selectedDirectory,
-          pickerAction === "file" ? "" : undefined
-        );
-        
         if (pickerAction === "folder") {
+          // Folders are created immediately
+          const newItem = await onCreate(
+            newItemName,
+            "folder",
+            selectedDirectory,
+            undefined
+          );
+          
           setCurrentWorkspace(newItem.id);
           setShowDashboard(false);
-        } else if (pickerAction === "file") {
-          openFileInEditor(newItem);
-        }
 
-        toast({
-          title: "Success",
-          description: `Created ${pickerAction}: ${newItemName}`,
-        });
+          toast({
+            title: "Success",
+            description: `Created folder: ${newItemName}`,
+          });
+        } else {
+          // Files are created as virtual tabs
+          const ext = newItemName.split(".").pop()?.toLowerCase();
+          let language = "plaintext";
+          
+          // Detect language from extension
+          switch (ext) {
+            case "js": language = "javascript"; break;
+            case "ts": language = "typescript"; break;
+            case "jsx": language = "javascript"; break;
+            case "tsx": language = "typescript"; break;
+            case "py": language = "python"; break;
+            case "lua": language = "lua"; break;
+            case "html": language = "html"; break;
+            case "css": language = "css"; break;
+            case "json": language = "json"; break;
+            case "md": language = "markdown"; break;
+            case "xml": language = "xml"; break;
+            case "yml":
+            case "yaml": language = "yaml"; break;
+            case "fluxo": language = "fluxo"; break;
+            case "fxo": language = "fluxo"; break;
+            case "fxm": language = "fluxo-module"; break;
+          }
+
+          createVirtualTab(newItemName, language);
+          setShowDashboard(false);
+        }
       } catch (error) {
         toast({
           title: "Error",
@@ -305,7 +454,11 @@ export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, work
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
-                {pickerAction === "import" ? "Select Folder to Open" : `Select Location for New ${pickerAction === "folder" ? "Folder" : "File"}`}
+                {pickerAction === "import" 
+                  ? "Select Folder to Open" 
+                  : pickerAction === "saveas"
+                  ? "Save File As"
+                  : `Select Location for New ${pickerAction === "folder" ? "Folder" : "File"}`}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
@@ -346,7 +499,7 @@ export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, work
                 Cancel
               </Button>
               <Button onClick={handleConfirmPicker} data-testid="button-confirm-picker">
-                {pickerAction === "import" ? "Open" : "Create"}
+                {pickerAction === "import" ? "Open" : pickerAction === "saveas" ? "Save" : "Create"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -382,6 +535,16 @@ export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, work
                 data-testid="button-new-folder"
               >
                 <FolderPlus className="w-3 h-3" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={() => setShowExtensionManager(true)}
+                title="Extensions"
+                data-testid="button-extensions"
+              >
+                <Package className="w-3 h-3" />
               </Button>
               {hasUnsavedChanges.size > 0 && (
                 <Button
@@ -475,14 +638,18 @@ export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, work
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {pickerAction === "import" ? "Select Folder to Open" : `Select Location for New ${pickerAction === "folder" ? "Folder" : "File"}`}
+              {pickerAction === "import" 
+                ? "Select Folder to Open" 
+                : pickerAction === "saveas"
+                ? "Save File As"
+                : `Select Location for New ${pickerAction === "folder" ? "Folder" : "File"}`}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {pickerAction !== "import" && (
               <div>
                 <label className="text-sm font-medium text-foreground mb-2 block">
-                  {pickerAction === "folder" ? "Folder" : "File"} Name:
+                  {pickerAction === "saveas" ? "File" : pickerAction === "folder" ? "Folder" : "File"} Name:
                 </label>
                 <Input
                   value={newItemName}
@@ -516,9 +683,16 @@ export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, work
               Cancel
             </Button>
             <Button onClick={handleConfirmPicker} data-testid="button-confirm-picker">
-              {pickerAction === "import" ? "Open" : "Create"}
+              {pickerAction === "import" ? "Open" : pickerAction === "saveas" ? "Save" : "Create"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Extension Manager Dialog */}
+      <Dialog open={showExtensionManager} onOpenChange={setShowExtensionManager}>
+        <DialogContent className="max-w-3xl h-[80vh] p-0">
+          <ExtensionManager />
         </DialogContent>
       </Dialog>
     </div>
@@ -537,6 +711,8 @@ function getExtensionForLanguage(language: string): string {
     case "markdown": return "md";
     case "xml": return "xml";
     case "yaml": return "yml";
+    case "fluxo": return "fxo";
+    case "fluxo-module": return "fxm";
     default: return "txt";
   }
 }

@@ -467,6 +467,8 @@ function detectLanguage(filename: string): string {
     case "yml":
     case "yaml": return "yaml";
     case "fluxo": return "fluxo";
+    case "fxo": return "fluxo";
+    case "fxm": return "fluxo-module";
     default: return "plaintext";
   }
 }
