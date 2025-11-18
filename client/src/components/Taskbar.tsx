@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Terminal, Code, FolderOpen, FileText, Activity, Globe, Menu, Clock, Store, Zap, X, Info } from "lucide-react";
+import { Terminal, Code, FolderOpen, FileText, Activity, Globe, Menu, Clock, Store, Zap, X, Info, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,18 +28,33 @@ const APP_MENU = [
 
 export function Taskbar({ windows, onOpenApp, onFocusWindow, onMinimizeWindow, onCloseWindow }: TaskbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
   const [propertiesWindow, setPropertiesWindow] = useState<WindowState | null>(null);
+  const [recentApps, setRecentApps] = useState<WindowState["appType"][]>([]);
 
+  /**
+   * Formats uptime from a timestamp (number in milliseconds, ISO date string, or Date object)
+   * According to shared/schema.ts, WindowState.createdAt is a number (milliseconds since epoch)
+   */
   const formatUptime = (createdAt: string | Date | number | null | undefined) => {
     if (!createdAt) return "Unknown";
     
-    const now = new Date();
+    // Convert to Date object - handles number (ms timestamp), string (ISO date), or Date
     const createdDate = new Date(createdAt);
     
+    // Validate the resulting date is valid
     if (isNaN(createdDate.getTime())) return "Unknown";
     
+    const now = new Date();
     const diff = now.getTime() - createdDate.getTime();
+    
+    // Additional validation: ensure the timestamp is reasonable (not in the future, not too old)
+    if (diff < 0 || diff > 1000 * 60 * 60 * 24 * 365) {
+      // Negative time (future) or more than 1 year is suspicious
+      return "Unknown";
+    }
+    
     const seconds = Math.floor(diff / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
@@ -55,6 +71,19 @@ export function Taskbar({ windows, onOpenApp, onFocusWindow, onMinimizeWindow, o
     }, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  // Track recent apps
+  useEffect(() => {
+    const appTypes = windows.map(w => w.appType);
+    const uniqueApps = Array.from(new Set([...appTypes, ...recentApps])).slice(0, 6);
+    if (JSON.stringify(uniqueApps) !== JSON.stringify(recentApps)) {
+      setRecentApps(uniqueApps);
+    }
+  }, [windows]);
+
+  const filteredApps = searchQuery.trim()
+    ? APP_MENU.filter(app => app.label.toLowerCase().includes(searchQuery.toLowerCase()))
+    : APP_MENU.filter(app => recentApps.includes(app.type));
 
   return (
     <div className="fixed bottom-0 left-0 right-0 h-12 bg-card border-t border-card-border flex items-center px-2 gap-2 z-50" data-testid="taskbar">
@@ -76,25 +105,55 @@ export function Taskbar({ windows, onOpenApp, onFocusWindow, onMinimizeWindow, o
           className="w-64 p-2 bg-popover border-popover-border"
           data-testid="start-menu"
         >
-          <div className="space-y-1">
-            {APP_MENU.map((app) => {
-              const Icon = app.icon;
-              return (
-                <Button
-                  key={app.type}
-                  variant="ghost"
-                  className="w-full justify-start gap-3 h-10"
-                  onClick={() => {
-                    onOpenApp(app.type);
-                    setMenuOpen(false);
-                  }}
-                  data-testid={`menu-item-${app.type}`}
-                >
-                  <Icon className={`w-5 h-5 ${app.color}`} />
-                  <span className="text-sm">{app.label}</span>
-                </Button>
-              );
-            })}
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search apps..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-9"
+                data-testid="input-search-apps"
+              />
+            </div>
+            
+            {!searchQuery.trim() && filteredApps.length > 0 && (
+              <div className="text-xs text-muted-foreground px-2">Recent</div>
+            )}
+            
+            <div className="space-y-1 max-h-80 overflow-y-auto">
+              {filteredApps.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-4">
+                  {searchQuery.trim() ? "No apps found" : "No recent apps"}
+                </div>
+              ) : (
+                filteredApps.map((app) => {
+                  const Icon = app.icon;
+                  return (
+                    <Button
+                      key={app.type}
+                      variant="ghost"
+                      className="w-full justify-start gap-3 h-10"
+                      onClick={() => {
+                        onOpenApp(app.type);
+                        setMenuOpen(false);
+                        setSearchQuery("");
+                      }}
+                      data-testid={`menu-item-${app.type}`}
+                    >
+                      <Icon className={`w-5 h-5 ${app.color}`} />
+                      <span className="text-sm">{app.label}</span>
+                    </Button>
+                  );
+                })
+              )}
+            </div>
+            
+            {searchQuery.trim() && (
+              <div className="text-xs text-muted-foreground px-2 pt-1 border-t">
+                {filteredApps.length} {filteredApps.length === 1 ? "app" : "apps"} found
+              </div>
+            )}
           </div>
         </PopoverContent>
       </Popover>
