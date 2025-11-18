@@ -69,6 +69,9 @@ export class FluxoInterpreter {
       } else if (this.isExportedFunctionCall(line)) {
         this.executeExportedFunction(line);
         i++;
+      } else if (line.includes(':') && line.includes('(')) {
+        this.evaluateColonMethodCall(line);
+        i++;
       } else {
         i++;
       }
