@@ -34,8 +34,8 @@ export function TerminalApp({ onCommand }: TerminalAppProps) {
 
   useEffect(() => {
     // Update suggestions based on input
-    if (input.startsWith("/")) {
-      const searchTerm = input.slice(1).toLowerCase();
+    if (input.trim()) {
+      const searchTerm = input.toLowerCase();
       const matches = TERMINAL_COMMANDS.filter(cmd =>
         cmd.command.toLowerCase().startsWith(searchTerm)
       );
@@ -51,8 +51,7 @@ export function TerminalApp({ onCommand }: TerminalAppProps) {
     if (!input.trim()) return;
 
     const trimmedInput = input.trim();
-    const commandLine = trimmedInput.startsWith("/") ? trimmedInput.slice(1) : trimmedInput;
-    const [cmd, ...args] = commandLine.split(" ");
+    const [cmd, ...args] = trimmedInput.split(" ");
 
     // Add command to lines
     setLines(prev => [...prev, { type: "command", text: `> ${trimmedInput}` }]);
@@ -85,10 +84,10 @@ export function TerminalApp({ onCommand }: TerminalAppProps) {
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setSelectedSuggestion(prev => (prev - 1 + suggestions.length) % suggestions.length);
-      } else if (e.key === "Tab" || e.key === "Enter") {
+      } else if (e.key === "Tab") {
         if (suggestions[selectedSuggestion]) {
           e.preventDefault();
-          setInput(`/${suggestions[selectedSuggestion].command} `);
+          setInput(`${suggestions[selectedSuggestion].command} `);
           setSuggestions([]);
         }
       }
@@ -141,7 +140,7 @@ export function TerminalApp({ onCommand }: TerminalAppProps) {
                 i === selectedSuggestion ? "bg-accent" : "hover-elevate"
               }`}
               onClick={() => {
-                setInput(`/${suggestion.command} `);
+                setInput(`${suggestion.command} `);
                 setSuggestions([]);
                 inputRef.current?.focus();
               }}
@@ -167,7 +166,7 @@ export function TerminalApp({ onCommand }: TerminalAppProps) {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           className="flex-1 bg-transparent outline-none text-green-400"
-          placeholder="Type / to see commands..."
+          placeholder="Type a command (e.g., help, ls, open)..."
           autoFocus
           data-testid="terminal-input"
         />

@@ -35,38 +35,57 @@ export function WindowManager({
 }: WindowManagerProps) {
   const [draggingWindow, setDraggingWindow] = useState<string | null>(null);
   const [resizingWindow, setResizingWindow] = useState<string | null>(null);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const dragStartRef = useRef({ x: 0, y: 0, windowX: 0, windowY: 0 });
+  const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
   useEffect(() => {
+    let rafId: number | null = null;
+    let lastUpdate = 0;
+    const UPDATE_INTERVAL = 16; // ~60fps
+
     const handleMouseMove = (e: MouseEvent) => {
-      if (draggingWindow) {
-        const window = windows.find(w => w.id === draggingWindow);
-        if (window && !window.isMaximized) {
-          const deltaX = e.clientX - dragStart.x;
-          const deltaY = e.clientY - dragStart.y;
-          onUpdatePosition(draggingWindow, {
-            x: Math.max(0, window.position.x + deltaX),
-            y: Math.max(0, window.position.y + deltaY),
-          });
-          setDragStart({ x: e.clientX, y: e.clientY });
+      if (draggingWindow || resizingWindow) {
+        const now = Date.now();
+        if (now - lastUpdate < UPDATE_INTERVAL) {
+          return;
         }
-      }
-      
-      if (resizingWindow) {
-        const window = windows.find(w => w.id === resizingWindow);
-        if (window) {
-          const deltaX = e.clientX - resizeStart.x;
-          const deltaY = e.clientY - resizeStart.y;
-          onUpdateSize(resizingWindow, {
-            width: Math.max(400, resizeStart.width + deltaX),
-            height: Math.max(300, resizeStart.height + deltaY),
-          });
+        lastUpdate = now;
+
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
         }
+
+        rafId = requestAnimationFrame(() => {
+          if (draggingWindow) {
+            const windowState = windows.find(w => w.id === draggingWindow);
+            if (windowState && !windowState.isMaximized) {
+              const deltaX = e.clientX - dragStartRef.current.x;
+              const deltaY = e.clientY - dragStartRef.current.y;
+              const newX = Math.max(0, Math.min(globalThis.innerWidth - 100, dragStartRef.current.windowX + deltaX));
+              const newY = Math.max(0, Math.min(globalThis.innerHeight - 100, dragStartRef.current.windowY + deltaY));
+              
+              onUpdatePosition(draggingWindow, { x: newX, y: newY });
+            }
+          }
+          
+          if (resizingWindow) {
+            const deltaX = e.clientX - resizeStartRef.current.x;
+            const deltaY = e.clientY - resizeStartRef.current.y;
+            onUpdateSize(resizingWindow, {
+              width: Math.max(400, resizeStartRef.current.width + deltaX),
+              height: Math.max(300, resizeStartRef.current.height + deltaY),
+            });
+          }
+          rafId = null;
+        });
       }
     };
 
     const handleMouseUp = () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       setDraggingWindow(null);
       setResizingWindow(null);
     };
@@ -75,11 +94,14 @@ export function WindowManager({
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
       return () => {
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+        }
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
       };
     }
-  }, [draggingWindow, resizingWindow, dragStart, resizeStart, windows, onUpdatePosition, onUpdateSize]);
+  }, [draggingWindow, resizingWindow, windows, onUpdatePosition, onUpdateSize]);
 
   return (
     <>
@@ -110,8 +132,13 @@ export function WindowManager({
                 className="h-8 bg-card border-b border-card-border flex items-center justify-between px-3 cursor-move select-none"
                 onMouseDown={(e) => {
                   if (!window.isMaximized) {
+                    dragStartRef.current = {
+                      x: e.clientX,
+                      y: e.clientY,
+                      windowX: window.position.x,
+                      windowY: window.position.y,
+                    };
                     setDraggingWindow(window.id);
-                    setDragStart({ x: e.clientX, y: e.clientY });
                   }
                 }}
                 onDoubleClick={() => onMaximize(window.id)}
@@ -172,13 +199,13 @@ export function WindowManager({
                   className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize"
                   onMouseDown={(e) => {
                     e.stopPropagation();
-                    setResizingWindow(window.id);
-                    setResizeStart({
+                    resizeStartRef.current = {
                       x: e.clientX,
                       y: e.clientY,
                       width: window.size.width,
                       height: window.size.height,
-                    });
+                    };
+                    setResizingWindow(window.id);
                   }}
                   data-testid={`resize-handle-${window.id}`}
                 />

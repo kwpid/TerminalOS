@@ -101,13 +101,14 @@ export default function Desktop() {
     switch (command.toLowerCase()) {
       case "help":
         return `Available commands:
-  /open [ref/value] - Opens specified folder or file
-  /taskmanager - Opens task manager
-  /help - Shows this list of commands
-  /getinfo [trg] - Gets data from specified target
-  /close [ref/trg] - Closes an opened target
-  /ls - Lists files in current directory
-  /clear - Clears the terminal`;
+  open [name] - Opens specified folder or file
+  taskmanager - Opens task manager
+  help - Shows this list of commands
+  getinfo [name] - Gets data from specified target
+  close [window-id] - Closes window by ID
+  windows - Lists all open windows with IDs
+  ls - Lists files in current directory
+  clear - Clears the terminal`;
 
       case "taskmanager":
         createWindow("taskmanager");
@@ -146,17 +147,21 @@ ${targetItem.type === "file" ? `Size: ${targetItem.content?.length || 0} bytes` 
 
       case "close":
         if (args.length === 0) {
-          return "Error: Please specify a window to close";
+          return "Error: Please specify a window ID";
         }
-        const windowTitle = args.join(" ");
-        const windowToClose = windows.find(w =>
-          w.title.toLowerCase().includes(windowTitle.toLowerCase())
-        );
+        const windowId = args[0];
+        const windowToClose = windows.find(w => w.id === windowId);
         if (!windowToClose) {
-          return `Error: No window matching "${windowTitle}" found`;
+          return `Error: Window ID "${windowId}" not found. Use 'windows' to see all window IDs.`;
         }
         closeWindow(windowToClose.id);
         return `Closed ${windowToClose.title}`;
+
+      case "windows":
+        if (windows.length === 0) {
+          return "No windows open";
+        }
+        return windows.map(w => `ID: ${w.id} | ${w.title}${w.isMinimized ? " (minimized)" : ""}`).join("\n");
 
       case "ls":
         const items = fileSystem.filter(i => i.parentId === null);

@@ -125,25 +125,70 @@ export function WebBrowserApp({ initialUrl = "https://example.com" }: WebBrowser
             <div className="text-muted-foreground">Loading...</div>
           </div>
         )}
-        <div className="h-full p-8 overflow-auto" data-testid="browser-content">
-          <div className="max-w-4xl mx-auto space-y-4">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-              {currentUrl}
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              This is a simulated web browser. In a full implementation, this would render actual web content.
-            </p>
-            <div className="mt-8 p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Example Content
-              </h2>
-              <p className="text-gray-700 dark:text-gray-300">
-                The web browser can navigate to different URLs, maintain history, and simulate page loading.
-                Use the navigation controls above to browse.
-              </p>
+        {currentUrl === "https://example.com" ? (
+          <div className="h-full flex flex-col items-center justify-center p-8 overflow-auto" data-testid="browser-content">
+            <div className="max-w-2xl w-full space-y-8 text-center">
+              <div className="space-y-4">
+                <h1 className="text-6xl font-bold bg-gradient-to-r from-blue-600 via-red-500 to-yellow-500 bg-clip-text text-transparent">
+                  Search
+                </h1>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Simulated Search Engine
+                </p>
+              </div>
+              
+              <div className="relative max-w-xl mx-auto">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search the web..."
+                  className="w-full px-12 py-4 text-lg rounded-full border-2 border-gray-300 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && e.currentTarget.value) {
+                      navigate(`https://search.example.com/q=${encodeURIComponent(e.currentTarget.value)}`);
+                    }
+                  }}
+                  data-testid="search-input"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
+                <button
+                  onClick={() => navigate("https://news.example.com")}
+                  className="px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md text-gray-700 dark:text-gray-300 font-medium transition-colors"
+                >
+                  News
+                </button>
+                <button
+                  onClick={() => navigate("https://mail.example.com")}
+                  className="px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md text-gray-700 dark:text-gray-300 font-medium transition-colors"
+                >
+                  Mail
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="h-full p-8 overflow-auto" data-testid="browser-content">
+            <div className="max-w-4xl mx-auto space-y-4">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                {currentUrl}
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                This is a simulated web browser showing content for: {currentUrl}
+              </p>
+              <div className="mt-8 p-6 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                  Simulated Page Content
+                </h2>
+                <p className="text-gray-700 dark:text-gray-300">
+                  The web browser can navigate to different URLs, maintain history, and simulate page loading.
+                  Use the navigation controls above to browse or the home button to return to the start page.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

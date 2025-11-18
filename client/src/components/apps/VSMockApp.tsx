@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { ChevronRight, ChevronDown, File, Folder, Plus, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronRight, ChevronDown, File, Folder, Plus, X, Save, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 import type { FileSystemItem } from "@shared/schema";
 
 interface VSMockAppProps {
@@ -23,6 +24,8 @@ export function VSMockApp({ fileSystem, onOpenFile, onSaveFile }: VSMockAppProps
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(["/"]));
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<Set<string>>(new Set());
+  const { toast } = useToast();
 
   const toggleFolder = (folderId: string) => {
     setExpandedFolders(prev => {
@@ -68,8 +71,42 @@ export function VSMockApp({ fileSystem, onOpenFile, onSaveFile }: VSMockAppProps
     setOpenTabs(prev =>
       prev.map(tab => (tab.id === tabId ? { ...tab, content } : tab))
     );
-    onSaveFile(tabId, content);
+    setHasUnsavedChanges(prev => new Set([...prev, tabId]));
   };
+
+  const saveFile = (tabId: string) => {
+    const tab = openTabs.find(t => t.id === tabId);
+    if (tab) {
+      onSaveFile(tabId, tab.content);
+      setHasUnsavedChanges(prev => {
+        const next = new Set(prev);
+        next.delete(tabId);
+        return next;
+      });
+      toast({
+        title: "File saved",
+        description: `${tab.name} has been saved.`,
+      });
+    }
+  };
+
+  const saveAllFiles = () => {
+    hasUnsavedChanges.forEach(tabId => saveFile(tabId));
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (activeTab) {
+          saveFile(activeTab);
+        }
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeTab, openTabs]);
 
   const renderFileTree = (parentId: string | null, level = 0) => {
     const items = fileSystem.filter(item => item.parentId === parentId);
@@ -123,6 +160,18 @@ export function VSMockApp({ fileSystem, onOpenFile, onSaveFile }: VSMockAppProps
         <div className="w-60 bg-card border-r border-card-border flex flex-col" data-testid="vsmock-sidebar">
           <div className="h-8 border-b border-card-border flex items-center justify-between px-3">
             <span className="text-xs font-medium text-foreground">EXPLORER</span>
+            {hasUnsavedChanges.size > 0 && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={saveAllFiles}
+                title="Save All"
+                data-testid="button-save-all"
+              >
+                <Save className="w-3 h-3" />
+              </Button>
+            )}
           </div>
           <ScrollArea className="flex-1">
             {renderFileTree(null)}
@@ -145,14 +194,23 @@ export function VSMockApp({ fileSystem, onOpenFile, onSaveFile }: VSMockAppProps
                 data-testid={`tab-${tab.id}`}
               >
                 <File className="w-3 h-3 text-blue-400" />
-                <span className="text-xs text-foreground">{tab.name}</span>
+                <span className="text-xs text-foreground">
+                  {tab.name}
+                  {hasUnsavedChanges.has(tab.id) && " •"}
+                </span>
                 <Button
                   size="icon"
                   variant="ghost"
                   className="h-4 w-4 ml-1"
                   onClick={(e) => {
                     e.stopPropagation();
-                    closeTab(tab.id);
+                    if (hasUnsavedChanges.has(tab.id)) {
+                      if (confirm(`${tab.name} has unsaved changes. Close anyway?`)) {
+                        closeTab(tab.id);
+                      }
+                    } else {
+                      closeTab(tab.id);
+                    }
                   }}
                   data-testid={`button-close-tab-${tab.id}`}
                 >

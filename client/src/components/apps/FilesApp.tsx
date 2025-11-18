@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { ArrowLeft, Folder, File, Trash2, Plus, Search } from "lucide-react";
+import { ArrowLeft, Folder, File, Trash2, Plus, Search, Copy, Scissors, Clipboard, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ContextMenu } from "@/components/ContextMenu";
 import type { FileSystemItem } from "@shared/schema";
 
 interface FilesAppProps {
@@ -25,6 +26,10 @@ export function FilesApp({
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [creatingItem, setCreatingItem] = useState<{ type: "file" | "folder" } | null>(null);
+  const [newItemName, setNewItemName] = useState("");
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: FileSystemItem } | null>(null);
+  const [clipboard, setClipboard] = useState<{ item: FileSystemItem; operation: "copy" | "cut" } | null>(null);
 
   const currentFolder = currentFolderId ? fileSystem.find(item => item.id === currentFolderId) : null;
   const items = fileSystem.filter(item => item.parentId === currentFolderId);
@@ -44,6 +49,65 @@ export function FilesApp({
     } else {
       onOpenFile(item);
     }
+  };
+
+  const handleCreateItem = () => {
+    if (!newItemName.trim() || !creatingItem) return;
+    
+    if (creatingItem.type === "folder") {
+      onCreateFolder(newItemName, currentFolderId);
+    } else {
+      onCreateFile(newItemName, currentFolderId);
+    }
+    
+    setCreatingItem(null);
+    setNewItemName("");
+  };
+
+  const handleCancelCreate = () => {
+    setCreatingItem(null);
+    setNewItemName("");
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, item: FileSystemItem) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, item });
+  };
+
+  const handleCopy = (item: FileSystemItem) => {
+    setClipboard({ item, operation: "copy" });
+  };
+
+  const handleCut = (item: FileSystemItem) => {
+    setClipboard({ item, operation: "cut" });
+  };
+
+  const handlePaste = () => {
+    if (!clipboard) return;
+    
+    const newName = clipboard.item.name;
+    const newParent = currentFolderId;
+    
+    if (clipboard.operation === "copy") {
+      // Create a copy of the item
+      if (clipboard.item.type === "folder") {
+        onCreateFolder(newName + " (copy)", newParent);
+      } else {
+        onCreateFile(newName + " (copy)", newParent);
+      }
+    } else {
+      // Move the item (cut operation)
+      // Note: This would require an update endpoint to change parentId
+      // For now, we'll just show a message
+      console.log("Move operation not yet implemented");
+    }
+    
+    setClipboard(null);
+  };
+
+  const handleShowProperties = (item: FileSystemItem) => {
+    const props = `Name: ${item.name}\nType: ${item.type}\nCreated: ${new Date(item.createdAt).toLocaleString()}\nModified: ${new Date(item.modifiedAt).toLocaleString()}${item.content ? `\nSize: ${item.content.length} bytes` : ""}`;
+    alert(props);
   };
 
   const getBreadcrumbs = () => {
@@ -115,10 +179,8 @@ export function FilesApp({
           size="sm"
           variant="ghost"
           className="h-7"
-          onClick={() => {
-            const name = prompt("Folder name:");
-            if (name) onCreateFolder(name, currentFolderId);
-          }}
+          onClick={() => setCreatingItem({ type: "folder" })}
+          disabled={creatingItem !== null}
           data-testid="button-new-folder"
         >
           <Plus className="w-4 h-4 mr-1" />
@@ -129,10 +191,8 @@ export function FilesApp({
           size="sm"
           variant="ghost"
           className="h-7"
-          onClick={() => {
-            const name = prompt("File name:");
-            if (name) onCreateFile(name, currentFolderId);
-          }}
+          onClick={() => setCreatingItem({ type: "file" })}
+          disabled={creatingItem !== null}
           data-testid="button-new-file"
         >
           <Plus className="w-4 h-4 mr-1" />
@@ -142,7 +202,7 @@ export function FilesApp({
 
       {/* Content Area */}
       <ScrollArea className="flex-1">
-        {filteredItems.length === 0 ? (
+        {filteredItems.length === 0 && !creatingItem ? (
           <div className="h-full flex items-center justify-center text-muted-foreground">
             <div className="text-center">
               <Folder className="w-16 h-16 mx-auto mb-4 opacity-20" />
@@ -152,17 +212,35 @@ export function FilesApp({
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-4 gap-4 p-4" data-testid="files-grid">
+            {creatingItem && (
+              <div className="flex flex-col items-center gap-2 p-3 rounded-md border-2 border-primary" data-testid="create-item-input">
+                {creatingItem.type === "folder" ? (
+                  <Folder className="w-12 h-12 text-yellow-400" />
+                ) : (
+                  <File className="w-12 h-12 text-blue-400" />
+                )}
+                <Input
+                  type="text"
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateItem();
+                    if (e.key === "Escape") handleCancelCreate();
+                  }}
+                  onBlur={handleCancelCreate}
+                  placeholder={`New ${creatingItem.type} name`}
+                  className="h-7 text-xs text-center"
+                  autoFocus
+                  data-testid="input-new-item-name"
+                />
+              </div>
+            )}
             {filteredItems.map(item => (
               <div
                 key={item.id}
                 className="flex flex-col items-center gap-2 p-3 rounded-md hover-elevate cursor-pointer"
                 onClick={() => handleItemClick(item)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  if (confirm(`Delete ${item.name}?`)) {
-                    onDeleteItem(item.id);
-                  }
-                }}
+                onContextMenu={(e) => handleContextMenu(e, item)}
                 data-testid={`file-item-${item.id}`}
               >
                 {item.type === "folder" ? (
@@ -178,11 +256,35 @@ export function FilesApp({
           </div>
         ) : (
           <div className="p-2 space-y-1" data-testid="files-list">
+            {creatingItem && (
+              <div className="flex items-center gap-3 p-2 rounded-md border-2 border-primary" data-testid="create-item-input">
+                {creatingItem.type === "folder" ? (
+                  <Folder className="w-5 h-5 text-yellow-400" />
+                ) : (
+                  <File className="w-5 h-5 text-blue-400" />
+                )}
+                <Input
+                  type="text"
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateItem();
+                    if (e.key === "Escape") handleCancelCreate();
+                  }}
+                  onBlur={handleCancelCreate}
+                  placeholder={`New ${creatingItem.type} name`}
+                  className="flex-1 h-7 text-sm"
+                  autoFocus
+                  data-testid="input-new-item-name"
+                />
+              </div>
+            )}
             {filteredItems.map(item => (
               <div
                 key={item.id}
                 className="flex items-center gap-3 p-2 rounded-md hover-elevate cursor-pointer"
                 onClick={() => handleItemClick(item)}
+                onContextMenu={(e) => handleContextMenu(e, item)}
                 data-testid={`file-item-${item.id}`}
               >
                 {item.type === "folder" ? (
@@ -213,6 +315,47 @@ export function FilesApp({
           </div>
         )}
       </ScrollArea>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={[
+            {
+              label: "Copy",
+              icon: <Copy className="w-4 h-4" />,
+              onClick: () => handleCopy(contextMenu.item),
+            },
+            {
+              label: "Cut",
+              icon: <Scissors className="w-4 h-4" />,
+              onClick: () => handleCut(contextMenu.item),
+            },
+            ...(clipboard
+              ? [
+                  {
+                    label: "Paste",
+                    icon: <Clipboard className="w-4 h-4" />,
+                    onClick: handlePaste,
+                  },
+                ]
+              : []),
+            {
+              label: "Delete",
+              icon: <Trash2 className="w-4 h-4" />,
+              onClick: () => onDeleteItem(contextMenu.item.id),
+              variant: "destructive" as const,
+            },
+            {
+              label: "Properties",
+              icon: <Info className="w-4 h-4" />,
+              onClick: () => handleShowProperties(contextMenu.item),
+            },
+          ]}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }
