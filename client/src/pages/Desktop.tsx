@@ -7,6 +7,8 @@ import { FilesApp } from "@/components/apps/FilesApp";
 import { NotepadApp } from "@/components/apps/NotepadApp";
 import { TaskManagerApp } from "@/components/apps/TaskManagerApp";
 import { WebBrowserApp } from "@/components/apps/WebBrowserApp";
+import { WebStoreApp } from "@/components/apps/WebStoreApp";
+import { VelocityApp } from "@/components/apps/VelocityApp";
 import { useFileSystem } from "@/hooks/useFileSystem";
 import { useWindows } from "@/hooks/useWindows";
 import type { WindowState, Process } from "@shared/schema";
@@ -15,6 +17,7 @@ let nextProcessId = 1;
 
 export default function Desktop() {
   const [processes, setProcesses] = useState<Process[]>([]);
+  const [currentDir, setCurrentDir] = useState<string | null>(null);
   const { fileSystem, isLoading: fsLoading, createItem, updateItem, deleteItem } = useFileSystem();
   const { windows, isLoading: windowsLoading, createWindow: createWindowAPI, updateWindow: updateWindowAPI, deleteWindow: deleteWindowAPI } = useWindows();
 
@@ -98,17 +101,140 @@ export default function Desktop() {
 
   // Terminal Command Handler
   const handleTerminalCommand = useCallback(async (command: string, args: string[]): Promise<string> => {
+    const currentPath = currentDir ? fileSystem.find(i => i.id === currentDir) : null;
+    const currentItems = fileSystem.filter(i => i.parentId === currentDir);
+    
     switch (command.toLowerCase()) {
       case "help":
-        return `Available commands:
-  open [name] - Opens specified folder or file
-  taskmanager - Opens task manager
-  help - Shows this list of commands
-  getinfo [name] - Gets data from specified target
-  close [window-id] - Closes window by ID
-  windows - Lists all open windows with IDs
-  ls - Lists files in current directory
-  clear - Clears the terminal`;
+        return `╔═══════════════════════════════════════════════╗
+║         TERMINAL SIMULATOR v1.0.0         ║
+╠═══════════════════════════════════════════════╣
+║ NAVIGATION COMMANDS                       ║
+╠═══════════════════════════════════════════════╣
+║ cd [path]      Change directory           ║
+║ pwd            Print working directory    ║
+║ ls [path]      List files/folders         ║
+╠═══════════════════════════════════════════════╣
+║ FILE MANAGEMENT                           ║
+╠═══════════════════════════════════════════════╣
+║ mkdir [name]   Create folder              ║
+║ touch [name]   Create file                ║
+║ rm [name]      Remove file/folder         ║
+║ cat [name]     Display file contents      ║
+║ echo [text]    Print or write to file     ║
+╠═══════════════════════════════════════════════╣
+║ WINDOW MANAGEMENT                         ║
+╠═══════════════════════════════════════════════╣
+║ open [name]    Open file or folder        ║
+║ windows        List all open windows      ║
+║ close [id]     Close window by ID         ║
+║ taskmanager    Open task manager          ║
+╠═══════════════════════════════════════════════╣
+║ SYSTEM                                    ║
+╠═══════════════════════════════════════════════╣
+║ clear          Clear terminal screen      ║
+╚═══════════════════════════════════════════════╝`;
+
+      case "pwd":
+        return currentPath ? `/${currentPath.name}` : "/";
+
+      case "cd":
+        if (args.length === 0 || args[0] === "/") {
+          setCurrentDir(null);
+          return "Changed to root directory";
+        }
+        if (args[0] === "..") {
+          if (currentPath && currentPath.parentId) {
+            setCurrentDir(currentPath.parentId);
+            const parent = fileSystem.find(i => i.id === currentPath.parentId);
+            return `Changed to /${parent?.name || ""}`;
+          } else {
+            setCurrentDir(null);
+            return "Changed to root directory";
+          }
+        }
+        const targetFolder = currentItems.find(
+          i => i.type === "folder" && i.name.toLowerCase() === args[0].toLowerCase()
+        );
+        if (!targetFolder) {
+          return `Error: Directory "${args[0]}" not found`;
+        }
+        setCurrentDir(targetFolder.id);
+        return `Changed to /${targetFolder.name}`;
+
+      case "ls":
+        const items = currentItems;
+        if (items.length === 0) {
+          return "Empty directory";
+        }
+        const output = items.map(i => {
+          const icon = i.type === "folder" ? "📁" : i.type === "image" ? "🖼️" : "📄";
+          const size = i.type === "file" ? ` (${i.content?.length || 0}B)` : "";
+          return `${icon} ${i.name}${size}`;
+        }).join("\n");
+        return `Total ${items.length} items\n\n${output}`;
+
+      case "mkdir":
+        if (args.length === 0) {
+          return "Error: Please specify folder name";
+        }
+        const folderName = args.join(" ");
+        await createFileSystemItem(folderName, "folder", currentDir);
+        return `Created folder: ${folderName}`;
+
+      case "touch":
+        if (args.length === 0) {
+          return "Error: Please specify file name";
+        }
+        const fileName = args.join(" ");
+        await createFileSystemItem(fileName, "file", currentDir, "");
+        return `Created file: ${fileName}`;
+
+      case "rm":
+        if (args.length === 0) {
+          return "Error: Please specify file or folder name";
+        }
+        const itemToDelete = currentItems.find(
+          i => i.name.toLowerCase() === args[0].toLowerCase()
+        );
+        if (!itemToDelete) {
+          return `Error: "${args[0]}" not found`;
+        }
+        await deleteFileSystemItem(itemToDelete.id);
+        return `Removed: ${itemToDelete.name}`;
+
+      case "cat":
+        if (args.length === 0) {
+          return "Error: Please specify file name";
+        }
+        const fileToRead = currentItems.find(
+          i => i.type === "file" && i.name.toLowerCase() === args[0].toLowerCase()
+        );
+        if (!fileToRead) {
+          return `Error: File "${args[0]}" not found`;
+        }
+        return fileToRead.content || "(empty file)";
+
+      case "echo":
+        if (args.length === 0) {
+          return "";
+        }
+        const redirectIndex = args.indexOf(">");
+        if (redirectIndex !== -1 && redirectIndex < args.length - 1) {
+          const text = args.slice(0, redirectIndex).join(" ");
+          const targetFile = args[redirectIndex + 1];
+          const existingFile = currentItems.find(
+            i => i.type === "file" && i.name.toLowerCase() === targetFile.toLowerCase()
+          );
+          if (existingFile) {
+            await updateFileContent(existingFile.id, text);
+            return `Wrote to ${targetFile}`;
+          } else {
+            await createFileSystemItem(targetFile, "file", currentDir, text);
+            return `Created and wrote to ${targetFile}`;
+          }
+        }
+        return args.join(" ");
 
       case "taskmanager":
         createWindow("taskmanager");
@@ -119,31 +245,18 @@ export default function Desktop() {
           return "Error: Please specify a file or folder to open";
         }
         const itemName = args.join(" ");
-        const item = fileSystem.find(i => i.name.toLowerCase() === itemName.toLowerCase());
+        const item = currentItems.find(i => i.name.toLowerCase() === itemName.toLowerCase());
         if (!item) {
-          return `Error: "${itemName}" not found`;
+          return `Error: "${itemName}" not found in current directory`;
         }
         if (item.type === "folder") {
           createWindow("files", `Files - ${item.name}`, { folderId: item.id });
+        } else if (item.type === "image") {
+          createWindow("notepad", `Image - ${item.name}`, { fileId: item.id });
         } else {
           createWindow("notepad", `Notepad - ${item.name}`, { fileId: item.id });
         }
         return `Opened ${item.name}`;
-
-      case "getinfo":
-        if (args.length === 0) {
-          return "Error: Please specify a target";
-        }
-        const target = args.join(" ");
-        const targetItem = fileSystem.find(i => i.name.toLowerCase() === target.toLowerCase());
-        if (!targetItem) {
-          return `Error: "${target}" not found`;
-        }
-        return `Name: ${targetItem.name}
-Type: ${targetItem.type}
-Created: ${new Date(targetItem.createdAt).toLocaleString()}
-Modified: ${new Date(targetItem.modifiedAt).toLocaleString()}
-${targetItem.type === "file" ? `Size: ${targetItem.content?.length || 0} bytes` : ""}`;
 
       case "close":
         if (args.length === 0) {
@@ -161,22 +274,16 @@ ${targetItem.type === "file" ? `Size: ${targetItem.content?.length || 0} bytes` 
         if (windows.length === 0) {
           return "No windows open";
         }
-        return windows.map(w => `ID: ${w.id} | ${w.title}${w.isMinimized ? " (minimized)" : ""}`).join("\n");
-
-      case "ls":
-        const items = fileSystem.filter(i => i.parentId === null);
-        if (items.length === 0) {
-          return "No files or folders";
-        }
-        return items.map(i => `${i.type === "folder" ? "📁" : "📄"} ${i.name}`).join("\n");
+        return `Open Windows (${windows.length}):\n\n` + 
+          windows.map(w => `• ${w.id.padEnd(15)} ${w.title}${w.isMinimized ? " (minimized)" : ""}`).join("\n");
 
       case "clear":
         return "__CLEAR__";
 
       default:
-        return `Command not found: ${command}. Type 'help' for available commands.`;
+        return `Command not found: ${command}\nType 'help' for available commands.`;
     }
-  }, [fileSystem, windows, createWindow, closeWindow]);
+  }, [fileSystem, windows, currentDir, createWindow, closeWindow, createFileSystemItem, deleteFileSystemItem, updateFileContent]);
 
   const endProcess = useCallback((processId: string) => {
     const process = processes.find(p => p.id === processId);
@@ -256,6 +363,14 @@ ${targetItem.type === "file" ? `Size: ${targetItem.content?.length || 0} bytes` 
                 return <TaskManagerApp processes={processes} onEndTask={endProcess} />;
               case "webbrowser":
                 return <WebBrowserApp initialUrl={window.data?.url} />;
+              case "webstore":
+                return <WebStoreApp onInstallApp={(appId) => {
+                  if (appId === "velocity") {
+                    createWindow("velocity");
+                  }
+                }} />;
+              case "velocity":
+                return <VelocityApp windows={windows} />;
               default:
                 return <div>Unknown app type</div>;
             }
@@ -282,6 +397,8 @@ function getDefaultTitle(appType: WindowState["appType"]): string {
     case "notepad": return "Notepad";
     case "taskmanager": return "Task Manager";
     case "webbrowser": return "Web Browser";
+    case "webstore": return "Web Store";
+    case "velocity": return "Velocity";
     default: return "Window";
   }
 }
@@ -294,10 +411,15 @@ function detectLanguage(filename: string): string {
     case "jsx": return "javascript";
     case "tsx": return "typescript";
     case "py": return "python";
+    case "lua": return "lua";
     case "html": return "html";
     case "css": return "css";
     case "json": return "json";
     case "md": return "markdown";
+    case "txt": return "plaintext";
+    case "xml": return "xml";
+    case "yml":
+    case "yaml": return "yaml";
     default: return "plaintext";
   }
 }

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Minus, Square, Terminal as TerminalIcon, Code, FolderOpen, FileText, Activity, Globe } from "lucide-react";
+import { X, Minus, Square, Terminal as TerminalIcon, Code, FolderOpen, FileText, Activity, Globe, Store, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { WindowState } from "@shared/schema";
 
@@ -21,6 +21,8 @@ const APP_ICONS = {
   notepad: FileText,
   taskmanager: Activity,
   webbrowser: Globe,
+  webstore: Store,
+  velocity: Zap,
 };
 
 export function WindowManager({

@@ -71,7 +71,7 @@ export function VSMockApp({ fileSystem, onOpenFile, onSaveFile }: VSMockAppProps
     setOpenTabs(prev =>
       prev.map(tab => (tab.id === tabId ? { ...tab, content } : tab))
     );
-    setHasUnsavedChanges(prev => new Set([...prev, tabId]));
+    setHasUnsavedChanges(prev => new Set(Array.from(prev).concat(tabId)));
   };
 
   const saveFile = (tabId: string) => {

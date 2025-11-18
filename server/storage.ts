@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import type { FileSystemItem, InsertFileSystemItem, WindowState, InsertWindowState } from "@shared/schema";
+import type { FileSystemItem, InsertFileSystemItem, WindowState, InsertWindowState, AppBackendCode } from "@shared/schema";
 
 export interface IStorage {
   // File System Operations
@@ -29,6 +29,9 @@ export class MemStorage implements IStorage {
     
     // Initialize with default file system
     this.initializeDefaultFileSystem();
+    
+    // Initialize with default windows
+    this.initializeDefaultWindows();
   }
 
   private initializeDefaultFileSystem() {
@@ -172,6 +175,152 @@ export class MemStorage implements IStorage {
     });
   }
 
+  private initializeDefaultWindows() {
+    const defaultWindow: WindowState = {
+      id: "default-vsmock",
+      appType: "vsmock",
+      title: "VS.Mock",
+      isMinimized: false,
+      isMaximized: false,
+      position: { x: 100, y: 80 },
+      size: { width: 900, height: 650 },
+      zIndex: 1,
+      data: {},
+      backendCode: this.generateBackendCode("vsmock"),
+    };
+    this.windows.set(defaultWindow.id, defaultWindow);
+  }
+
+  private generateBackendCode(appType: string): AppBackendCode {
+    const backendCodes = {
+      vsmock: {
+        files: [
+          {
+            name: "editor.ts",
+            path: "/src/editor.ts",
+            content: `import { EditorState } from "./state";
+import { FileManager } from "./fileManager";
+
+export class CodeEditor {
+  private state: EditorState;
+  private fileManager: FileManager;
+  
+  constructor() {
+    this.state = new EditorState();
+    this.fileManager = new FileManager();
+  }
+  
+  openFile(filePath: string) {
+    const file = this.fileManager.loadFile(filePath);
+    this.state.setActiveFile(file);
+  }
+  
+  saveFile() {
+    const content = this.state.getContent();
+    this.fileManager.save(this.state.activeFile, content);
+  }
+}`,
+            language: "typescript",
+          },
+          {
+            name: "fileManager.ts",
+            path: "/src/fileManager.ts",
+            content: `export class FileManager {
+  private cache: Map<string, string> = new Map();
+  
+  loadFile(path: string): string {
+    if (this.cache.has(path)) {
+      return this.cache.get(path)!;
+    }
+    // Load from file system
+    const content = this.readFromDisk(path);
+    this.cache.set(path, content);
+    return content;
+  }
+  
+  private readFromDisk(path: string): string {
+    // Implementation hidden
+    return "";
+  }
+}`,
+            language: "typescript",
+            isHidden: true,
+          },
+        ],
+        logs: [
+          "[INFO] Editor initialized",
+          "[INFO] File manager ready",
+          "[DEBUG] Syntax highlighting enabled",
+        ],
+        structure: "MVC Pattern with State Management",
+      },
+      terminal: {
+        files: [
+          {
+            name: "shell.ts",
+            path: "/src/shell.ts",
+            content: `export class Shell {
+  private currentDir: string = "/";
+  private history: string[] = [];
+  
+  execute(command: string): string {
+    this.history.push(command);
+    const [cmd, ...args] = command.split(" ");
+    return this.processCommand(cmd, args);
+  }
+  
+  private processCommand(cmd: string, args: string[]): string {
+    switch(cmd) {
+      case "ls": return this.list();
+      case "cd": return this.changeDir(args[0]);
+      default: return "Command not found";
+    }
+  }
+}`,
+            language: "typescript",
+          },
+        ],
+        logs: [
+          "[INFO] Shell session started",
+          "[DEBUG] Command parser loaded",
+        ],
+        structure: "Command Pattern",
+      },
+      files: {
+        files: [
+          {
+            name: "fileExplorer.ts",
+            path: "/src/fileExplorer.ts",
+            content: `export class FileExplorer {
+  private currentPath: string = "/";
+  
+  navigate(path: string) {
+    this.currentPath = path;
+    return this.listFiles(path);
+  }
+  
+  listFiles(path: string) {
+    // Returns file list
+    return [];
+  }
+}`,
+            language: "typescript",
+          },
+        ],
+        logs: [
+          "[INFO] File explorer initialized",
+        ],
+        structure: "Tree View Pattern",
+      },
+    };
+
+    return backendCodes[appType as keyof typeof backendCodes] || {
+      files: [],
+      logs: [],
+      structure: "Unknown",
+    };
+  }
+
   // File System Operations
   async getFileSystemItems(): Promise<FileSystemItem[]> {
     return Array.from(this.fileSystemItems.values());
@@ -240,6 +389,7 @@ export class MemStorage implements IStorage {
       position: { x: 100, y: 100 },
       size: { width: 800, height: 600 },
       zIndex: this.windows.size + 1,
+      backendCode: this.generateBackendCode(insertWindow.appType),
     };
     this.windows.set(id, window);
     return window;
