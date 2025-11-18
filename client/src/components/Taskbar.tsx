@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Terminal, Code, FolderOpen, FileText, Activity, Globe, Menu, Clock } from "lucide-react";
+import { Terminal, Code, FolderOpen, FileText, Activity, Globe, Menu, Clock, Store, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { WindowState } from "@shared/schema";
@@ -16,8 +16,10 @@ const APP_MENU = [
   { type: "vsmock" as const, icon: Code, label: "VS.Mock", color: "text-blue-400" },
   { type: "files" as const, icon: FolderOpen, label: "Files", color: "text-yellow-400" },
   { type: "notepad" as const, icon: FileText, label: "Notepad", color: "text-gray-400" },
-  { type: "taskmanager" as const, icon: Activity, label: "Task Manager", color: "text-red-400" },
   { type: "webbrowser" as const, icon: Globe, label: "Web Browser", color: "text-purple-400" },
+  { type: "webstore" as const, icon: Store, label: "Web Store", color: "text-cyan-400" },
+  { type: "velocity" as const, icon: Zap, label: "Velocity", color: "text-orange-400" },
+  { type: "taskmanager" as const, icon: Activity, label: "Task Manager", color: "text-red-400" },
 ];
 
 export function Taskbar({ windows, onOpenApp, onFocusWindow, onMinimizeWindow }: TaskbarProps) {

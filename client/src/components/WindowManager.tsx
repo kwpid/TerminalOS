@@ -37,22 +37,17 @@ export function WindowManager({
 }: WindowManagerProps) {
   const [draggingWindow, setDraggingWindow] = useState<string | null>(null);
   const [resizingWindow, setResizingWindow] = useState<string | null>(null);
+  const [localPositions, setLocalPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [localSizes, setLocalSizes] = useState<Record<string, { width: number; height: number }>>({});
   const dragStartRef = useRef({ x: 0, y: 0, windowX: 0, windowY: 0 });
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
+  const pendingUpdateRef = useRef<{ position?: { id: string; pos: { x: number; y: number } }; size?: { id: string; size: { width: number; height: number } } }>({});
 
   useEffect(() => {
     let rafId: number | null = null;
-    let lastUpdate = 0;
-    const UPDATE_INTERVAL = 16; // ~60fps
 
     const handleMouseMove = (e: MouseEvent) => {
       if (draggingWindow || resizingWindow) {
-        const now = Date.now();
-        if (now - lastUpdate < UPDATE_INTERVAL) {
-          return;
-        }
-        lastUpdate = now;
-
         if (rafId !== null) {
           cancelAnimationFrame(rafId);
         }
@@ -66,17 +61,21 @@ export function WindowManager({
               const newX = Math.max(0, Math.min(globalThis.innerWidth - 100, dragStartRef.current.windowX + deltaX));
               const newY = Math.max(0, Math.min(globalThis.innerHeight - 100, dragStartRef.current.windowY + deltaY));
               
-              onUpdatePosition(draggingWindow, { x: newX, y: newY });
+              // Update local state immediately for smooth dragging
+              setLocalPositions(prev => ({ ...prev, [draggingWindow]: { x: newX, y: newY } }));
+              pendingUpdateRef.current.position = { id: draggingWindow, pos: { x: newX, y: newY } };
             }
           }
           
           if (resizingWindow) {
             const deltaX = e.clientX - resizeStartRef.current.x;
             const deltaY = e.clientY - resizeStartRef.current.y;
-            onUpdateSize(resizingWindow, {
-              width: Math.max(400, resizeStartRef.current.width + deltaX),
-              height: Math.max(300, resizeStartRef.current.height + deltaY),
-            });
+            const newWidth = Math.max(400, resizeStartRef.current.width + deltaX);
+            const newHeight = Math.max(300, resizeStartRef.current.height + deltaY);
+            
+            // Update local state immediately for smooth resizing
+            setLocalSizes(prev => ({ ...prev, [resizingWindow]: { width: newWidth, height: newHeight } }));
+            pendingUpdateRef.current.size = { id: resizingWindow, size: { width: newWidth, height: newHeight } };
           }
           rafId = null;
         });
@@ -88,6 +87,19 @@ export function WindowManager({
         cancelAnimationFrame(rafId);
         rafId = null;
       }
+      
+      // Save to API when dragging/resizing stops
+      if (pendingUpdateRef.current.position) {
+        const { id, pos } = pendingUpdateRef.current.position;
+        onUpdatePosition(id, pos);
+        pendingUpdateRef.current.position = undefined;
+      }
+      if (pendingUpdateRef.current.size) {
+        const { id, size } = pendingUpdateRef.current.size;
+        onUpdateSize(id, size);
+        pendingUpdateRef.current.size = undefined;
+      }
+      
       setDraggingWindow(null);
       setResizingWindow(null);
     };
@@ -112,13 +124,17 @@ export function WindowManager({
         .sort((a, b) => a.zIndex - b.zIndex)
         .map((window) => {
           const Icon = APP_ICONS[window.appType];
+          // Use local position/size during drag/resize for smooth updates
+          const position = localPositions[window.id] || window.position;
+          const size = localSizes[window.id] || window.size;
+          
           const style = window.isMaximized
             ? { top: 0, left: 0, width: "100%", height: "calc(100vh - 48px)" }
             : {
-                top: window.position.y,
-                left: window.position.x,
-                width: window.size.width,
-                height: window.size.height,
+                top: position.y,
+                left: position.x,
+                width: size.width,
+                height: size.height,
               };
 
           return (
