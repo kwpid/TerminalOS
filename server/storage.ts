@@ -149,6 +149,99 @@ export class MemStorage implements IStorage {
         modifiedAt: Date.now(),
       },
       {
+        id: "fluxo-folder",
+        name: "Fluxo Scripts",
+        type: "folder",
+        parentId: "root-projects",
+        createdAt: Date.now(),
+        modifiedAt: Date.now(),
+      },
+      {
+        id: "sample-fluxo-intro",
+        name: "intro.fluxo",
+        type: "file",
+        parentId: "fluxo-folder",
+        content: `// Fluxo Language Introduction
+// This is a sample Fluxo script
+
+local app = window_Id(window-11)
+
+export function simulate() {
+  local info = app.info:(null)
+  
+  sys.log("Welcome to Fluxo!")
+  sys.log("Window ID:", info.id)
+  sys.log("Window Title:", info.title)
+}`,
+        language: "fluxo",
+        createdAt: Date.now(),
+        modifiedAt: Date.now(),
+      },
+      {
+        id: "sample-fluxo-library",
+        name: "library-demo.fluxo",
+        type: "file",
+        parentId: "fluxo-folder",
+        content: `// Fluxo Library Demo
+// Demonstrates working with window libraries
+
+local app = window_Id(window-11)
+
+export function getInfo(path, data, returnJson) {
+  local data = app.info:(data)
+  local path = data.libary{
+    app.libary:find(crossSection)
+  }
+
+  sys.log("Library Path:", path)
+  returnJson(path)
+}
+
+export function updateData(key, value) {
+  local result = app.database:write(key, value)
+  sys.log("Updated", key)
+  return result
+}`,
+        language: "fluxo",
+        createdAt: Date.now(),
+        modifiedAt: Date.now(),
+      },
+      {
+        id: "sample-fluxo-advanced",
+        name: "advanced.fluxo",
+        type: "file",
+        parentId: "fluxo-folder",
+        content: `// Advanced Fluxo Example
+// Working with multiple windows and complex data
+
+local mainWindow = window_Id(window-11)
+
+export function processWindowData() {
+  local windowInfo = mainWindow.info:(null)
+  
+  sys.log("=== Window Analysis ===")
+  sys.log("ID:", windowInfo.id)
+  sys.log("Type:", windowInfo.appType)
+  sys.log("Title:", windowInfo.title)
+  
+  local sectionData = windowInfo.libary{
+    mainWindow.libary:find(mainSection)
+  }
+  
+  sys.log("=== Library Data ===")
+  sys.log("Section:", sectionData)
+  
+  local crossData = windowInfo.libary{
+    mainWindow.libary:find(crossSection)
+  }
+  
+  sys.log("Cross-section:", crossData)
+}`,
+        language: "fluxo",
+        createdAt: Date.now(),
+        modifiedAt: Date.now(),
+      },
+      {
         id: "sample-script",
         name: "app.js",
         type: "file",

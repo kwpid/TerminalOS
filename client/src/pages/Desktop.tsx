@@ -127,6 +127,9 @@ WINDOW MANAGEMENT:
   getinfo [id]       Get window information
   taskmanager        Open task manager
 
+FLUXO LANGUAGE:
+  fluxo [file]       Execute a Fluxo script (.fluxo)
+
 SYSTEM:
   clear              Clear terminal screen`;
 
@@ -297,6 +300,29 @@ SYSTEM:
       case "clear":
         return "__CLEAR__";
 
+      case "fluxo":
+        if (args.length === 0) {
+          return "Error: Please specify a Fluxo script file to execute";
+        }
+        const fluxoFilename = args.join(" ");
+        const fluxoFile = currentItems.find(
+          i => i.type === "file" && i.name.toLowerCase() === fluxoFilename.toLowerCase()
+        );
+        if (!fluxoFile) {
+          return `Error: File "${fluxoFilename}" not found in current directory`;
+        }
+        if (!fluxoFile.name.endsWith('.fluxo') && !fluxoFile.language?.includes('fluxo')) {
+          return `Error: "${fluxoFilename}" is not a Fluxo script file (.fluxo)`;
+        }
+        try {
+          const { FluxoInterpreter } = await import('@shared/fluxo-interpreter');
+          const interpreter = new FluxoInterpreter(windows);
+          const result = interpreter.execute(fluxoFile.content || '');
+          return `Executing ${fluxoFile.name}...\n\n${result}`;
+        } catch (error) {
+          return `Error executing Fluxo script: ${error instanceof Error ? error.message : String(error)}`;
+        }
+
       default:
         return `Command not found: ${command}\nType 'help' for available commands.`;
     }
@@ -440,6 +466,7 @@ function detectLanguage(filename: string): string {
     case "xml": return "xml";
     case "yml":
     case "yaml": return "yaml";
+    case "fluxo": return "fluxo";
     default: return "plaintext";
   }
 }

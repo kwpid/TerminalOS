@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { CodeEditor } from "@/components/CodeEditor";
 import type { FileSystemItem } from "@shared/schema";
 
 interface VSStudioAppProps {
@@ -447,10 +448,10 @@ export function VSStudioApp({ fileSystem, onOpenFile, onSaveFile, onCreate, work
         {/* Editor Content */}
         <div className="flex-1 overflow-hidden">
           {activeTabData ? (
-            <Textarea
+            <CodeEditor
               value={activeTabData.content}
-              onChange={(e) => updateTabContent(activeTabData.id, e.target.value)}
-              className="w-full h-full font-mono text-sm resize-none border-0 rounded-none focus-visible:ring-0"
+              onChange={(content) => updateTabContent(activeTabData.id, content)}
+              language={activeTabData.language}
               placeholder="Start typing..."
               data-testid="vsstudio-editor"
             />

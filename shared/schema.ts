@@ -25,6 +25,18 @@ export const insertFileSystemItemSchema = z.object({
 export type InsertFileSystemItem = z.infer<typeof insertFileSystemItemSchema>;
 
 // Window Management Types
+export interface WindowLibrary {
+  [key: string]: any;
+}
+
+export interface WindowInfo {
+  id: string;
+  title: string;
+  appType: string;
+  library?: WindowLibrary;
+  data?: any;
+}
+
 export interface WindowState {
   id: string;
   appType: "terminal" | "vsstudio" | "files" | "notepad" | "taskmanager" | "webbrowser" | "webstore" | "velocity";
@@ -38,6 +50,7 @@ export interface WindowState {
   backendCode?: AppBackendCode; // Backend code for the app
   createdAt: number; // Timestamp when window was created (for uptime calculation)
   workspacePath?: string; // For VS.Studio workspace
+  library?: WindowLibrary; // Library data for Fluxo language
 }
 
 export interface AppBackendCode {
@@ -161,6 +174,12 @@ export const TERMINAL_COMMANDS: TerminalCommand[] = [
     params: ["window-id"],
     description: "Get information about a window",
     syntax: "getinfo [window-id]"
+  },
+  {
+    command: "fluxo",
+    params: ["filepath"],
+    description: "Execute a Fluxo script file",
+    syntax: "fluxo [filepath]"
   }
 ];
 

@@ -285,4 +285,9 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+
+  /* Fluxo Syntax Highlighting */
+  .fluxo-syntax {
+    line-height: 1.6;
+  }
 }

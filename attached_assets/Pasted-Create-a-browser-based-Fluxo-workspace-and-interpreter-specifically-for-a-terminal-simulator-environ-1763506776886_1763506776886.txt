@@ -1,0 +1,147 @@
+Create a browser-based Fluxo workspace and interpreter specifically for a terminal simulator environment. Implement the following Fluxo language rules exactly as described.
+
+1️⃣ Core Concepts
+1.1 Window Objects
+local app = window_Id(window-11)
+
+
+window_Id(...) returns a window object.
+
+All operations on app are scoped to that window.
+
+app.info always fetches info for that specific window.
+
+1.2 Variables
+
+local name = value → defines a local variable.
+
+Variables are scoped to the function or block they’re defined in.
+
+2️⃣ Functions & Exports
+2.1 Function Definition
+export function getInfo(path, data, returnJson) {
+  ...
+}
+
+
+export function → callable outside of the current script.
+
+Functions can accept any value.
+
+2.2 Function Calls
+
+Use () to supply values:
+
+app.info:(data)
+
+
+: connects the function to its value(s).
+
+Example: app.libary:find(crossSection) calls find with the value crossSection.
+
+3️⃣ Blocks {}
+local path = data.libary{
+  app.libary:find(crossSection)
+}
+
+
+{} attaches code to a parent object.
+
+The block executes in the context of the object (data.libary here).
+
+The value of the block becomes the value of the variable on the left-hand side (local path = ...).
+
+4️⃣ Chaining
+
+Use : to chain a function with a value:
+
+object:method(value)
+
+
+Use {} to define sub-blocks of code executed in a specific context:
+
+parentObject{
+  childObject:method(arg)
+}
+
+
+Combine both:
+
+local result = app.library{
+  data:find("target")
+}
+
+5️⃣ Pipelines & Data Flow (Optional / Future)
+
+You can extend later with:
+
+data |> filter(active) |> map(normalize)
+
+
+But currently the main flow is () + : + {}.
+
+6️⃣ Example
+local app = window_Id(window-11)
+
+export function getInfo(path, data, returnJson) {
+  local data = app.info:(data)
+  local path = data.libary{
+    app.libary:find(crossSection)
+  }
+
+  returnJson(path)
+}
+
+export function updateData(key, value) {
+  local result = app.database:write(key, value)
+  sys.log("Updated", key)
+  return result
+}
+
+
+Explanation:
+
+app → window object
+
+app.info:(data) → fetch info from that window
+
+data.libary{ app.libary:find(crossSection) } → fetch crossSection from library and assign to path
+
+returnJson(path) → call a function with the result
+
+7️⃣ Fluxo Terminal Simulator Rules
+Symbol	Meaning
+local	define local variable
+export function	define function callable externally
+()	pass value(s) to function
+:	connect function with value (like “call with argument”)
+{}	scope code to a parent object; value of block becomes variable value
+app	window object returned from window_Id(...)
+sys.log()	print to terminal simulator console
+8️⃣ Interpreter Requirements
+
+Parse local, export function, (), :, {}
+
+Maintain window-scoped app objects
+
+Execute blocks {} in parent context
+
+Handle exported functions callable from other scripts
+
+Print messages via sys.log()
+
+Support nested : and {} chaining for arbitrary depth
+
+9️⃣ Starter Example Script
+local app = window_Id(window-11)
+
+export function simulate() {
+  local info = app.info:(null)
+
+  local section = info.libary{
+    app.libary:find("mainSection")
+  }
+
+  sys.log("Window Info:", info)
+  sys.log("Section Data:", section)
+}
