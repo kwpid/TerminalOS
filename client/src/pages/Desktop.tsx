@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { WindowManager } from "@/components/WindowManager";
 import { Taskbar } from "@/components/Taskbar";
 import { TerminalApp } from "@/components/apps/TerminalApp";
-import { VSMockApp } from "@/components/apps/VSMockApp";
+import { VSStudioApp } from "@/components/apps/VSStudioApp";
 import { FilesApp } from "@/components/apps/FilesApp";
 import { NotepadApp } from "@/components/apps/NotepadApp";
 import { TaskManagerApp } from "@/components/apps/TaskManagerApp";
@@ -106,34 +106,29 @@ export default function Desktop() {
     
     switch (command.toLowerCase()) {
       case "help":
-        return `╔═══════════════════════════════════════════════╗
-║         TERMINAL SIMULATOR v1.0.0         ║
-╠═══════════════════════════════════════════════╣
-║ NAVIGATION COMMANDS                       ║
-╠═══════════════════════════════════════════════╣
-║ cd [path]      Change directory           ║
-║ pwd            Print working directory    ║
-║ ls [path]      List files/folders         ║
-╠═══════════════════════════════════════════════╣
-║ FILE MANAGEMENT                           ║
-╠═══════════════════════════════════════════════╣
-║ mkdir [name]   Create folder              ║
-║ touch [name]   Create file                ║
-║ rm [name]      Remove file/folder         ║
-║ cat [name]     Display file contents      ║
-║ echo [text]    Print or write to file     ║
-╠═══════════════════════════════════════════════╣
-║ WINDOW MANAGEMENT                         ║
-╠═══════════════════════════════════════════════╣
-║ open [name]    Open file or folder        ║
-║ windows        List all open windows      ║
-║ close [id]     Close window by ID         ║
-║ taskmanager    Open task manager          ║
-╠═══════════════════════════════════════════════╣
-║ SYSTEM                                    ║
-╠═══════════════════════════════════════════════╣
-║ clear          Clear terminal screen      ║
-╚═══════════════════════════════════════════════╝`;
+        return `Terminal Simulator v1.0.0
+
+NAVIGATION:
+  cd [path]          Change directory
+  pwd                Print working directory
+  ls [path]          List files/folders
+
+FILE MANAGEMENT:
+  mkdir [name]       Create folder
+  touch [name]       Create file
+  rm [name]          Remove file/folder
+  cat [name]         Display file contents
+  echo [text]        Print or write to file
+
+WINDOW MANAGEMENT:
+  open [name]        Open file or folder
+  windows            List all open windows
+  close [id]         Close window by ID
+  getinfo [id]       Get window information
+  taskmanager        Open task manager
+
+SYSTEM:
+  clear              Clear terminal screen`;
 
       case "pwd":
         return currentPath ? `/${currentPath.name}` : "/";
@@ -277,6 +272,28 @@ export default function Desktop() {
         return `Open Windows (${windows.length}):\n\n` + 
           windows.map(w => `• ${w.id.padEnd(15)} ${w.title}${w.isMinimized ? " (minimized)" : ""}`).join("\n");
 
+      case "getinfo":
+        if (args.length === 0) {
+          return "Error: Please specify a window ID. Use 'windows' to see all window IDs.";
+        }
+        const targetWindow = windows.find(w => w.id === args[0]);
+        if (!targetWindow) {
+          return `Error: Window ID "${args[0]}" not found. Use 'windows' to see all window IDs.`;
+        }
+        const uptime = Date.now() - targetWindow.createdAt;
+        const uptimeStr = `${Math.floor(uptime / 1000)}s`;
+        const pathInfo = targetWindow.workspacePath ? `\nWorkspace Path: ${targetWindow.workspacePath}` : "";
+        const dataInfo = targetWindow.data ? `\nData: ${JSON.stringify(targetWindow.data, null, 2)}` : "";
+        return `Window Information:
+  ID: ${targetWindow.id}
+  Title: ${targetWindow.title}
+  Type: ${targetWindow.appType}
+  Status: ${targetWindow.isMinimized ? "Minimized" : targetWindow.isMaximized ? "Maximized" : "Normal"}
+  Position: x=${targetWindow.position.x}, y=${targetWindow.position.y}
+  Size: ${targetWindow.size.width}x${targetWindow.size.height}
+  Z-Index: ${targetWindow.zIndex}
+  Uptime: ${uptimeStr}${pathInfo}${dataInfo}`;
+
       case "clear":
         return "__CLEAR__";
 
@@ -324,12 +341,14 @@ export default function Desktop() {
             switch (window.appType) {
               case "terminal":
                 return <TerminalApp onCommand={handleTerminalCommand} />;
-              case "vsmock":
+              case "vsstudio":
                 return (
-                  <VSMockApp
+                  <VSStudioApp
                     fileSystem={fileSystem}
-                    onOpenFile={(fileId) => {}}
+                    onOpenFile={(fileId: string) => {}}
                     onSaveFile={updateFileContent}
+                    onCreate={createFileSystemItem}
+                    workspacePath={window.workspacePath}
                   />
                 );
               case "files":
@@ -392,7 +411,7 @@ export default function Desktop() {
 function getDefaultTitle(appType: WindowState["appType"]): string {
   switch (appType) {
     case "terminal": return "Terminal";
-    case "vsmock": return "VS.Mock";
+    case "vsstudio": return "VS.Studio";
     case "files": return "Files";
     case "notepad": return "Notepad";
     case "taskmanager": return "Task Manager";

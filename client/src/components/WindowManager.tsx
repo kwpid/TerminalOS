@@ -16,7 +16,7 @@ interface WindowManagerProps {
 
 const APP_ICONS = {
   terminal: TerminalIcon,
-  vsmock: Code,
+  vsstudio: Code,
   files: FolderOpen,
   notepad: FileText,
   taskmanager: Activity,

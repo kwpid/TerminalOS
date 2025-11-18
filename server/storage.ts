@@ -177,23 +177,24 @@ export class MemStorage implements IStorage {
 
   private initializeDefaultWindows() {
     const defaultWindow: WindowState = {
-      id: "default-vsmock",
-      appType: "vsmock",
-      title: "VS.Mock",
+      id: "default-vsstudio",
+      appType: "vsstudio",
+      title: "VS.Studio",
       isMinimized: false,
       isMaximized: false,
       position: { x: 100, y: 80 },
       size: { width: 900, height: 650 },
       zIndex: 1,
       data: {},
-      backendCode: this.generateBackendCode("vsmock"),
+      createdAt: Date.now(),
+      backendCode: this.generateBackendCode("vsstudio"),
     };
     this.windows.set(defaultWindow.id, defaultWindow);
   }
 
   private generateBackendCode(appType: string): AppBackendCode {
     const backendCodes = {
-      vsmock: {
+      vsstudio: {
         files: [
           {
             name: "editor.ts",
@@ -389,6 +390,7 @@ export class CodeEditor {
       position: { x: 100, y: 100 },
       size: { width: 800, height: 600 },
       zIndex: this.windows.size + 1,
+      createdAt: Date.now(),
       backendCode: this.generateBackendCode(insertWindow.appType),
     };
     this.windows.set(id, window);

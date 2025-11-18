@@ -27,15 +27,17 @@ export type InsertFileSystemItem = z.infer<typeof insertFileSystemItemSchema>;
 // Window Management Types
 export interface WindowState {
   id: string;
-  appType: "terminal" | "vsmock" | "files" | "notepad" | "taskmanager" | "webbrowser" | "webstore" | "velocity";
+  appType: "terminal" | "vsstudio" | "files" | "notepad" | "taskmanager" | "webbrowser" | "webstore" | "velocity";
   title: string;
   isMinimized: boolean;
   isMaximized: boolean;
   position: { x: number; y: number };
   size: { width: number; height: number };
   zIndex: number;
-  data?: any; // App-specific data (e.g., file path for notepad, url for browser)
+  data?: any; // App-specific data (e.g., file path for notepad, url for browser, workspace path for vsstudio)
   backendCode?: AppBackendCode; // Backend code for the app
+  createdAt: number; // Timestamp when window was created (for uptime calculation)
+  workspacePath?: string; // For VS.Studio workspace
 }
 
 export interface AppBackendCode {
@@ -53,9 +55,10 @@ export interface BackendFile {
 }
 
 export const insertWindowStateSchema = z.object({
-  appType: z.enum(["terminal", "vsmock", "files", "notepad", "taskmanager", "webbrowser", "webstore", "velocity"]),
+  appType: z.enum(["terminal", "vsstudio", "files", "notepad", "taskmanager", "webbrowser", "webstore", "velocity"]),
   title: z.string(),
   data: z.any().optional(),
+  workspacePath: z.string().optional(),
 });
 
 export type InsertWindowState = z.infer<typeof insertWindowStateSchema>;
@@ -152,6 +155,12 @@ export const TERMINAL_COMMANDS: TerminalCommand[] = [
     params: [],
     description: "Clear the terminal",
     syntax: "clear"
+  },
+  {
+    command: "getinfo",
+    params: ["window-id"],
+    description: "Get information about a window",
+    syntax: "getinfo [window-id]"
   }
 ];
 

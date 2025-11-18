@@ -13,7 +13,7 @@ interface TaskbarProps {
 
 const APP_MENU = [
   { type: "terminal" as const, icon: Terminal, label: "Terminal", color: "text-green-400" },
-  { type: "vsmock" as const, icon: Code, label: "VS.Mock", color: "text-blue-400" },
+  { type: "vsstudio" as const, icon: Code, label: "VS.Studio", color: "text-blue-400" },
   { type: "files" as const, icon: FolderOpen, label: "Files", color: "text-yellow-400" },
   { type: "notepad" as const, icon: FileText, label: "Notepad", color: "text-gray-400" },
   { type: "webbrowser" as const, icon: Globe, label: "Web Browser", color: "text-purple-400" },
